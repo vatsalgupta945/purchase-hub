@@ -5,7 +5,15 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-test-user-id', 'x-test-user-role', 'x-test-user-limit', 'x-test-user-email'],
+  })
+);
+app.options('*', cors());
 app.use(express.json());
 
 // Root health check endpoints for cloud deployment platforms (Render, Railway, etc.)

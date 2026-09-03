@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 
-const BASE = `${(import.meta.env['VITE_API_BASE_URL'] as string | undefined) ?? ""}/api`;
+const rawBase = ((import.meta.env['VITE_API_BASE_URL'] as string | undefined) ?? "").trim().replace(/\/+$/, "");
+const BASE = rawBase ? (rawBase.endsWith("/api") ? rawBase : `${rawBase}/api`) : "/api";
 
 export class ApiError extends Error {
   code: string;
