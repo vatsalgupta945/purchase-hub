@@ -1,20 +1,136 @@
 # AI Prompts & Workflow Log
 
-This document records the exact prompts and workflow instructions used during the development of this project, including mistakes, revisions, and corrections.
+This document records the exact prompts and workflow instructions used across all development sessions of this project from initial project inception, master prompt generation, feature implementations, and testing to cloud deployment and debugging.
 
 ---
 
-## Prompt Group 1: Backend Architecture & Implementation Plan Prompt
-**Goal**: Design the complete single-responsibility module structure, database schema DDL, REST API contracts, and server-side business rules.
+## Prompt Group 0A: Initial Assignment Brief & Architecture Strategy Request
+**Goal**: Request a modular implementation plan, identification of edge cases/ambiguities, error handling strategy, Supabase PostgreSQL schema, and generation of specialized prompts for Lovable (Frontend) and Antigravity (Backend).
 
 **Prompt**:
-> Build a Node.js + TypeScript + Express backend for a purchase requisition system. Database: Postgres hosted on Supabase. Auth: Supabase Auth (email/password)...
-> MODULE STRUCTURE: config, db/migrations, middleware (auth, requireRole, errorHandler), errors (AppError subclasses), validation (zod), and modules for profiles, requisitions, lineItems, approvals, ordering, receiving, assignedApprovers, comments, timeline, alerts, dashboard, exports.
+> 1. do not generate code for now
+> create a complete implementation plan structured
+> use only modular approach where each module handles single responsibility
+> handle errors gracefully using exception
+> create a test suite to test functionality
+> write a detailed documentation in README.md
+> specify assumptions wherever required and also add comments in the code
+> before proceeding, identify any ambiguities or edge cases
+> keep the implementation minimal and do not introduce any unnecessary dependencies
+> this is the assignment i have been given
+> i will make backend using antigravity 
+> abd frontend using lovable 
+> i want this application to be fast running 
+> and database as supabase 
+> i will deploy frontend at vercel and backend at render 
+> so generate separate prompts for frontend and backend 
+> all api endpoints document them so that i can give lovable to create my front end part
+> 
+> 2. so now you have generated implementaion plan and prompts what should be my next steps to build the application
+> 
+> 3. create a plan md document that i can post and also how will i do the supabase database creation
+> 
+> 4. can this work be done by antigravity instead or by me?
 
 **Output Evaluation**:
-- Produced a clean plan separating domain modules.
-- **Initial Flaw**: The initial draft suggested storing a cached `total` column on `requisitions`.
-- **Correction**: Updated to compute `total` dynamically in SQL queries as `COALESCE(SUM(ordered_quantity * unit_price), 0)::NUMERIC(12,2)` because line items are mutable pre-submission, preventing data drift between header and line items.
+- **Strategy & Plan Produced**:
+  1. Identified 10 core domain modules (profiles, requisitions, line items, approvals, ordering, receiving, assigned approvers, comments, timeline, alerts, dashboard, exports).
+  2. Defined clear boundaries: zero client-side totals, immutable single-writer timeline, snapshotting alert dismissals.
+  3. Outlined the complete REST API contract and Supabase PostgreSQL schema DDL.
+  4. Formulated specialized master prompts for Lovable (React + Vite + Tailwind frontend) and Antigravity (Node.js + Express + TypeScript backend).
+
+---
+
+## Prompt Group 0B: Generated Master Frontend Prompt (for Lovable)
+**Goal**: Specialized generation prompt specifying full frontend UI requirements, Supabase auth integration, role routing, and API integration.
+
+**Prompt**:
+> Build a React (Vite + Tailwind) frontend for a purchase-requisition system. Two roles: "requester" and "approver" — after login, route each role to a different default view and hide actions the role isn't allowed to take (the backend also enforces this, but the UI shouldn't offer buttons that will 403).
+> 
+> AUTH: use @supabase/supabase-js against these env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY. Sign-up/login via Supabase Auth email+password. After a successful sign-up, call POST {VITE_API_BASE_URL}/profiles once to create the backend-side profile row (new sign-ups are always role "requester"; approver accounts are seeded separately and just log in). Attach the Supabase session's access token as "Authorization: Bearer <token>" on every call to VITE_API_BASE_URL.
+> 
+> PAGES:
+> 1. Login / Signup — plain email+password forms via Supabase Auth.
+> 2. Dashboard (landing page after login) — calls GET /dashboard and shows: headline numbers (awaiting_approval, open_commitments_value, overdue_count, received_last_7_days), a breakdown by status, a breakdown by department, and a bar/line chart of received_per_week (8 weeks). Show an alerts badge in the nav using GET /alerts's "count" (approvers only).
+> 3. Requisitions list — searchable/filterable/sortable/paginated table backed entirely by GET /requisitions query params: search, status, department, owner_id, overdue, assigned_to_me, sort_by, sort_dir, page, page_size. Do not filter client-side — always re-query the server when a filter changes. Requesters only ever see their own; approvers can toggle between "full queue" (status=Submitted) and "assigned to me" (assigned_to_me=true).
+> 4. Requisition detail page — shows the requisition, its line items (editable only while status is Draft and the viewer is the owner), computed total, is_overdue flag, the assigned-approvers panel, the append-only timeline (GET /requisitions/:id/timeline), and a comment box (POST /requisitions/:id/comments — comments cannot be edited/deleted, don't build UI for that). Show role- and status-appropriate action buttons:
+>    - Owner + Draft: edit fields/lines, Submit, Archive.
+>    - Approver + Submitted: Approve, Reject (reason required, non-empty).
+>    - Approver + Approved: Mark Ordered.
+>    - Approver + Ordered: Record Receipt (per line, capped at remaining quantity in the UI, but always let the server be the final word), Extend Needed-By Date.
+>    - Any + any status: Archive / Restore.
+> 5. New Requisition form (requester only) — title, vendor_name, department, needed_by, then an inline line-item editor (description, ordered_quantity, unit_price) before Submit is enabled. Disable Submit until at least one line item exists.
+> 6. Approval queue page (approver only) — the Submitted list with row checkboxes and a "Bulk Approve" button calling POST /requisitions/bulk-approve; after the call, show a per-row result (approved vs refused-with-reason) from the response — do not assume a batch either fully succeeds or fully fails.
+> 7. Export button on the requisitions list (approver only) — hits GET /requisitions/export/open-commitments and downloads the returned CSV.
+> 
+> API BASE: {VITE_API_BASE_URL}/api. All endpoints require the bearer token except signup/login (handled by Supabase directly). Full contract:
+>   GET  /me
+>   POST /profiles                                    body: {}
+>   POST /requisitions                                 body: {title, vendor_name, department, needed_by}
+>   GET  /requisitions?search=&status=&department=&owner_id=&overdue=&assigned_to_me=&sort_by=&sort_dir=&page=&page_size= -> {data:[...], total, page, page_size}
+>   GET  /requisitions/:id                             -> requisition + line_items + total + is_overdue
+>   PATCH /requisitions/:id                            body: any of {title, vendor_name, department, needed_by} (owner, Draft only)
+>   PATCH /requisitions/:id/needed-by                  body: {needed_by} (approver, Ordered only)
+>   POST /requisitions/:id/submit
+>   POST /requisitions/:id/archive
+>   POST /requisitions/:id/restore
+>   POST /requisitions/:id/approve                     -> 200 or 409 {error:{code:"LIMIT_EXCEEDED"}}
+>   POST /requisitions/:id/reject                      body: {reason}
+>   POST /requisitions/:id/order
+>   POST /requisitions/:id/receipts                    body: {receipts:[{line_item_id, quantity_received}]}
+>   POST /requisitions/bulk-approve                    body: {requisition_ids:[...]} -> {results:[{id,status,reason?}]}
+>   GET  /requisitions/export/open-commitments         -> CSV file
+>   POST /requisitions/:id/line-items                  body: {description, ordered_quantity, unit_price}
+>   PATCH /requisitions/:id/line-items/:lineId
+>   DELETE /requisitions/:id/line-items/:lineId
+>   GET  /requisitions/:id/approvers                   -> [{approver_id, email, assigned_at}]
+>   POST /requisitions/:id/approvers                   body: {approver_id}
+>   DELETE /requisitions/:id/approvers/:approverId
+>   GET  /requisitions/:id/timeline                    -> ordered history rows
+>   POST /requisitions/:id/comments                    body: {body}
+>   GET  /alerts                                       -> {data:[...], count}
+>   POST /alerts/:requisitionId/dismiss
+>   GET  /dashboard                                    -> {awaiting_approval, open_commitments_value, overdue_count, received_last_7_days, by_status, by_department, received_per_week}
+> 
+> Every error response is {error:{code, message}}; surface `message` to the user in a toast/inline alert rather than a generic "something went wrong."
+> 
+> Keep it fast and minimal: no extra state-management library (React context is enough for auth + role), no UI kit beyond Tailwind + whatever Lovable already ships, and use `recharts` (or an equivalent already available) only for the dashboard charts.
+
+---
+
+## Prompt Group 0C: Generated Master Backend Prompt (for Antigravity)
+**Goal**: Specialized generation prompt specifying single-responsibility backend architecture, schema, business rules, testing, and error handling.
+
+**Prompt**:
+> Build a Node.js + TypeScript + Express backend for a purchase requisition system.
+> Database: Postgres hosted on Supabase. Auth: Supabase Auth (email/password); the backend verifies the Supabase-issued JWT on every request and does not implement its own login/signup.
+> 
+> MODULE STRUCTURE (one responsibility per module, do not merge these):
+> config, db/migrations, middleware (auth, requireRole, errorHandler), errors (AppError + ValidationError/AuthenticationError/ForbiddenError/NotFoundError/ConflictError subclasses), validation (per-resource schemas using zod), and one module per resource: profiles, requisitions, lineItems, approvals, ordering, receiving, assignedApprovers, comments, timeline, alerts, dashboard, exports.
+> The timeline module is the ONLY module allowed to insert into requisition_history — every other module calls into it rather than writing history rows itself.
+> 
+> DATABASE SCHEMA — create exactly these tables (see full column list, types, and constraints in the "Database schema" section of the attached plan):
+> profiles, requisitions, line_items, requisition_assigned_approvers, requisition_history, alert_dismissals. Requisition totals are NEVER stored — always computed server-side as SUM(ordered_quantity * unit_price). Enforce non-negativity and quantity constraints at the database level via CHECK constraints, in addition to application validation.
+> 
+> BUSINESS RULES (enforce ALL of these server-side, never trust the client):
+> - Roles: 'requester' and 'approver', fixed per account. Requesters create/edit/submit only their own Draft requisitions. Approvers cannot create requisitions or edit line items, except extending needed_by on an Ordered requisition.
+> - Lifecycle: Draft -> Submitted -> (Approved | Rejected). Approved -> Ordered -> Received. Rejected always returns to Draft (requires a non-empty reason). Any other transition must be rejected with 409 and an explanatory message.
+> - Approval: an approver may approve/reject any Submitted requisition (assignment is NOT a permission gate — every approver can see and act on the full queue). Approval succeeds only if the server-computed total <= that approver's own approval_limit; otherwise return 409 with code LIMIT_EXCEEDED and leave the requisition Submitted (no separate "escalated" state — it just waits for a sufficiently-authorized approver).
+> - Bulk approve: accepts a list of requisition ids, checks EACH independently against the caller's limit, and returns a per-item result — never fails the whole batch because one item exceeded the limit or wasn't Submitted.
+> - Receiving: accepts receipts per line item, rejects (409) any receipt that would push received_quantity above ordered_quantity, and automatically moves the requisition to Received once every line is fully received; otherwise it stays Ordered (partial receipt).
+> - Overdue = status Ordered AND needed_by < today AND at least one line still short of its ordered quantity. Computed at query time, never stored.
+> - Alerts: each dismissal is per-approver and stores the needed_by value in effect at dismissal time. When checking if an alert is currently dismissed, compare the requisition's CURRENT needed_by to the dismissed snapshot — if they differ, treat it as not dismissed (the alert has "reappeared").
+> - Timeline/history rows (creation, every status change with old+new status and actor, rejection reasons, every receipt, every comment) are append-only. No route may update or delete a history row, ever.
+> - Submitting requires at least one line item.
+> - Requisitions can be archived/restored from any status; archiving only hides them from default list views (sets archived_at), never blocks a workflow action.
+> 
+> API CONTRACT: implement exactly the endpoints listed under "API endpoints" in the attached plan (Section 4) — same paths, methods, request bodies, and response shapes, including the {error:{code,message}} error format for every failure case (400/401/403/404/409/500) via a single global error-handling middleware fed by the AppError hierarchy above.
+> 
+> SEARCH/LIST: the GET /requisitions endpoint must filter, sort, and paginate entirely in SQL (search over title+vendor_name, filters for status/department/owner_id/overdue/assigned_to_me, sort by needed_by/total/status, page+page_size with a returned total count) — never fetch all rows and filter in JS.
+> 
+> TESTING: write Jest unit tests for the business-rule modules (approvals, receiving, alerts, bulk-approve, total calculation) covering the boundary cases listed in Section 6 of the attached plan, plus Jest+Supertest integration tests for the full lifecycle happy path, role/ownership enforcement, and illegal-transition rejection.
+> 
+> Add comments explaining any non-obvious rule (e.g. why assignment isn't a permission gate, why totals aren't stored, why alert dismissals snapshot needed_by). Use only: express, pg, zod, jsonwebtoken (or supabase-js purely for JWT/JWKS verification), cors, dotenv, jest, supertest. No ORM.
 
 ---
 
