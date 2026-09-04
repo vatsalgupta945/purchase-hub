@@ -403,14 +403,3 @@ This document records the exact prompts and workflow instructions used across al
 
 ---
 
-## Prompt Group 20: Comprehensive Architecture, Implementation & Prompt Documentation
-**Goal**: Document the complete system architecture, technical choices, challenge resolutions, and full prompt history in the project documentation.
-
-**Prompt**:
-> okay the project is running give me the implementation plan of how this project got implemented ,various challenges you and i faced ,and architecture ,tech stack that was used ,and why
-> OKAY and also document whatever prompts i have used with you in ai prompts ,till deployement process and live site ,include all prompts even of previous sessions
-
-**Output Evaluation**:
-- **Implementation**:
-  1. Compiled exhaustive architecture and implementation summary covering decoupled frontend/backend design, PostgreSQL transactional guarantees, and tech stack rationale.
-  2. Updated `assignment-backend/docs/ai-prompts.md` with complete chronological records of all 20 prompt groups across planning, business logic, hierarchical approvals, user-scoped archiving, live cloud deployment, and compiler debugging.
