@@ -468,20 +468,6 @@ This document records the exact prompts and workflow instructions used across al
   2. **Dashboard Open Commitments Calculation**:
      - Corrected `openCommitmentsSql` in `assignment-backend/src/modules/dashboard/index.ts` to compute the exact outstanding unreceived dollar amount: $\sum (\text{ordered\_quantity} - \text{received\_quantity}) \times \text{unit\_price}$ for unfulfilled line items across active `Approved` and `Ordered` requisitions (excluding Drafts, Submitted, Rejected, fully Received, and user-archived requests).
 
----
-
-## Prompt Group 24: Git Synchronization & Push to Remote GitHub Repository
-**Goal**: Commit all verified frontend and backend changes to version control and synchronize with the remote GitHub repository.
-
-**Prompt**:
-> commit all changes to github
-
-**Output Evaluation**:
-- **Implementation**:
-  1. Staged all updated files across backend modules (`alerts`, `dashboard`, `requisitions`), frontend routes and components (`AppShell.tsx`, `requisitions.$id.tsx`, `api.ts`), test suites, and project documentation.
-  2. Created Git commit `b74844e` (*"Fix business rules: overdue alert retention, dashboard open commitments, timeline status display, and approver counts"*).
-  3. Pulled and rebased remote changes from `origin/main` and pushed the unified commit history cleanly to `https://github.com/vatsalgupta945/purchase-hub.git`.
 
 
----
 
