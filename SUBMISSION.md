@@ -2,7 +2,7 @@
 
 ## Links
 
-- **GitHub repository:** https://github.com/vatsalgupta945/purchase-hub.git (or https://github.com/vatsalgupta945/test1.git)
+- **GitHub repository:** https://github.com/vatsalgupta945/test1.git
 - **Live application (Frontend):**https://test1-24zk.vercel.app/
 - **Backend API (Render):** https://test1-3-4zmi.onrender.com (Health check: https://test1-3-4zmi.onrender.com/health)
 
