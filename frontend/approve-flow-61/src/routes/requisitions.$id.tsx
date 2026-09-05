@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { api, errorMessage, type LineItem, type RequisitionDetail } from "@/lib/api";
+import { api, errorMessage, type LineItem, type RequisitionDetail, type TimelineEntry } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { RequireAuth } from "@/components/AppShell";
 import { StatusBadge, money } from "@/components/StatusBadge";
@@ -180,20 +180,12 @@ function Detail() {
           <ApproverHierarchyPanel />
 
           <Panel title="Timeline">
-            <ol className="space-y-3 text-sm">
+            <ol className="space-y-3.5 text-sm">
               {(timelineQuery.data ?? []).length === 0 && (
                 <li className="text-muted-foreground">Nothing recorded yet.</li>
               )}
               {(timelineQuery.data ?? []).map((t) => (
-                <li key={t.id} className="border-l-2 border-border pl-3">
-                  <p className="font-medium">{t.event_type ?? t.action ?? "event"}</p>
-                  {t.body && <p className="text-muted-foreground">{t.body}</p>}
-                  {t.reason && <p className="text-muted-foreground">{t.reason}</p>}
-                  <p className="text-xs text-muted-foreground">
-                    {t.actor_email ? `${t.actor_email} · ` : ""}
-                    {new Date(t.created_at).toLocaleString()}
-                  </p>
-                </li>
+                <TimelineItem key={t.id} t={t} />
               ))}
             </ol>
           </Panel>
@@ -204,6 +196,73 @@ function Detail() {
         </div>
       </div>
     </div>
+  );
+}
+
+function TimelineItem({ t }: { t: TimelineEntry }) {
+  const getEventHeader = () => {
+    if (t.event_type === "status_change" || t.new_status) {
+      const targetStatus = (t.new_status || "").toUpperCase();
+      return (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-foreground">Status changed to</span>
+          <span
+            className={`font-bold tracking-wide px-1.5 py-0.2 text-xs rounded ${
+              targetStatus === "REJECTED"
+                ? "bg-destructive/15 text-destructive border border-destructive/30"
+                : targetStatus === "APPROVED"
+                ? "bg-chart-1/15 text-chart-1 border border-chart-1/30"
+                : targetStatus === "ORDERED"
+                ? "bg-primary/15 text-primary border border-primary/30"
+                : targetStatus === "SUBMITTED"
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                : "bg-muted text-foreground"
+            }`}
+          >
+            {targetStatus || "UPDATED"}
+          </span>
+          {t.old_status && t.new_status && (
+            <span className="text-[11px] text-muted-foreground">
+              ({t.old_status} → {t.new_status})
+            </span>
+          )}
+        </div>
+      );
+    }
+    if (t.event_type === "created") {
+      return <p className="font-semibold text-foreground">Requisition created</p>;
+    }
+    if (t.event_type === "receipt") {
+      return <p className="font-semibold text-foreground">Receipt recorded</p>;
+    }
+    if (t.event_type === "comment") {
+      return <p className="font-semibold text-foreground">Comment added</p>;
+    }
+    return <p className="font-semibold text-foreground">{t.event_type ?? t.action ?? "Event"}</p>;
+  };
+
+  const actorDisplay = t.actor_title
+    ? `${t.actor_title} (${t.actor_email})`
+    : t.actor_email || "System";
+
+  return (
+    <li className="border-l-2 border-border pl-3.5 py-0.5 space-y-1">
+      {getEventHeader()}
+      {t.body && <p className="text-sm text-foreground/90 bg-muted/40 p-2 rounded border">{t.body}</p>}
+      {t.reason && (
+        <div className="text-xs bg-muted/60 p-2 rounded border text-foreground/90 space-y-0.5">
+          <span className="font-medium text-muted-foreground block">
+            {t.new_status === "Rejected" ? "Rejection Reason:" : "Reason / Note:"}
+          </span>
+          <p>{t.reason}</p>
+        </div>
+      )}
+      <p className="text-[11px] text-muted-foreground pt-0.5">
+        <span>By: <strong className="text-foreground/80 font-medium">{actorDisplay}</strong></span>
+        <span className="mx-1.5">·</span>
+        <span>{new Date(t.created_at).toLocaleString()}</span>
+      </p>
+    </li>
   );
 }
 
@@ -281,7 +340,7 @@ function Actions({
           </div>
           <div className="flex gap-3 text-muted-foreground">
             <span>Spent this month: <strong className="text-foreground">{money(usedThisMonth)}</strong></span>
-            <span>Remaining: <strong className={remainingMonthlyLimit < r.total ? "text-destructive font-bold" : "text-emerald-600"}>{money(remainingMonthlyLimit)}</strong></span>
+            <span>Remaining: <strong className={remainingMonthlyLimit !== null && remainingMonthlyLimit < r.total ? "text-destructive font-bold" : "text-emerald-600"}>{money(remainingMonthlyLimit)}</strong></span>
           </div>
           <span className="w-full text-[11px] text-muted-foreground italic">
             * Limit resets automatically at the start of each month.

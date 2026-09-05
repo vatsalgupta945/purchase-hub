@@ -14,24 +14,32 @@ export const listAlertsHandler = async (
       SELECT 
         r.*,
         p.email as owner_email,
-        COALESCE(SUM(li.ordered_quantity * li.unit_price), 0)::NUMERIC(12,2) as total
-      FROM requisitions r
-      JOIN profiles p ON r.owner_id = p.id
-      LEFT JOIN line_items li ON r.id = li.requisition_id
-      JOIN requisition_assigned_approvers aa ON aa.requisition_id = r.id AND aa.approver_id = $1
-      WHERE r.status = 'Ordered'
-        AND r.needed_by < CURRENT_DATE
-        AND EXISTS (
-          SELECT 1 FROM line_items sub_li 
-          WHERE sub_li.requisition_id = r.id AND sub_li.received_quantity < sub_li.ordered_quantity
-        )
-        AND NOT EXISTS (
+        p.title as owner_title,
+        p.department as owner_department,
+        COALESCE(SUM(li.ordered_quantity * li.unit_price), 0)::NUMERIC(12,2) as total,
+        EXISTS (
           SELECT 1 FROM alert_dismissals ad
           WHERE ad.requisition_id = r.id 
             AND ad.approver_id = $1
             AND ad.dismissed_needed_by = r.needed_by
+        ) as is_dismissed
+      FROM requisitions r
+      JOIN profiles p ON r.owner_id = p.id
+      LEFT JOIN line_items li ON r.id = li.requisition_id
+      WHERE r.status IN ('Submitted', 'Approved', 'Ordered')
+        AND r.needed_by < CURRENT_DATE
+        AND (
+          r.status IN ('Submitted', 'Approved') OR EXISTS (
+            SELECT 1 FROM line_items sub_li 
+            WHERE sub_li.requisition_id = r.id AND sub_li.received_quantity < sub_li.ordered_quantity
+          )
         )
-      GROUP BY r.id, p.email
+        AND NOT EXISTS (
+          SELECT 1 FROM user_archived_requisitions uar
+          WHERE uar.requisition_id = r.id 
+            AND uar.user_id = $1
+        )
+      GROUP BY r.id, p.email, p.title, p.department
       ORDER BY r.needed_by ASC
     `;
 
@@ -40,11 +48,15 @@ export const listAlertsHandler = async (
       ...row,
       total: row.total.toString(),
       is_overdue: true,
+      is_dismissed: Boolean(row.is_dismissed),
     }));
+
+    const unDismissedCount = items.filter((item) => !item.is_dismissed).length;
 
     return res.json({
       data: items,
-      count: items.length,
+      count: unDismissedCount,
+      total_overdue: items.length,
     });
   } catch (error) {
     next(error);
@@ -66,16 +78,6 @@ export const dismissAlertHandler = async (
     }
 
     const requisition = reqResult.rows[0];
-
-    // Check assignment
-    const assignmentCheck = await query(
-      'SELECT 1 FROM requisition_assigned_approvers WHERE requisition_id = $1 AND approver_id = $2',
-      [requisitionId, user.id]
-    );
-
-    if (assignmentCheck.rows.length === 0) {
-      throw new ForbiddenError('You can only dismiss alerts for requisitions assigned to you');
-    }
 
     // Insert or update dismissal record with snapshot of current needed_by
     const sql = `

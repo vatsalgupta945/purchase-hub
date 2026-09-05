@@ -12,6 +12,6 @@ export const supabase = createClient(url ?? "http://localhost:54321", anonKey ??
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
-  ...(typeof window === "undefined" ? { realtime: { transport: WebSocket } } : {}),
+  ...(typeof window === "undefined" ? { realtime: { transport: WebSocket as any } } : {}),
 });
 

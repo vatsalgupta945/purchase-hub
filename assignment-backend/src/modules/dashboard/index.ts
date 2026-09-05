@@ -2,37 +2,64 @@ import { Request, Response, NextFunction } from 'express';
 import { query } from '../../db';
 
 export const getDashboardHandler = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // 1. Awaiting approval count
-    const awaitingRes = await query("SELECT COUNT(*) FROM requisitions WHERE status = 'Submitted' AND archived_at IS NULL");
-    const awaiting_approval = parseInt(awaitingRes.rows[0].count, 10);
+    const user = req.user;
+    const userId = user?.id;
+    const isRequester = user?.role === 'requester';
 
-    // 2. Open commitments value (total value of all requisitions currently Ordered)
-    const openCommitmentsRes = await query(`
-      SELECT COALESCE(SUM(li.ordered_quantity * li.unit_price), 0)::NUMERIC(12,2) as total_value
+    const userParam = userId ? [userId] : [];
+    const archiveCondition = userId
+      ? `AND NOT EXISTS (SELECT 1 FROM user_archived_requisitions uar WHERE uar.requisition_id = r.id AND uar.user_id = $1)`
+      : '';
+    const requesterCondition = isRequester && userId
+      ? `AND r.owner_id = $1`
+      : '';
+
+    // 1. Awaiting approval count (Submitted requisitions)
+    const awaitingSql = `
+      SELECT COUNT(*) 
+      FROM requisitions r 
+      WHERE r.status = 'Submitted' 
+        ${archiveCondition} 
+        ${requesterCondition}
+    `;
+    const awaitingRes = await query(awaitingSql, userParam);
+    const awaiting_approval = parseInt(awaitingRes.rows[0]?.count || '0', 10);
+
+    // 2. Open commitments value (unfulfilled remaining value of all requisitions currently Ordered)
+    const openCommitmentsSql = `
+      SELECT COALESCE(SUM((li.ordered_quantity - li.received_quantity) * li.unit_price), 0)::NUMERIC(12,2) as total_value
       FROM requisitions r
       JOIN line_items li ON r.id = li.requisition_id
-      WHERE r.status = 'Ordered' AND r.archived_at IS NULL
-    `);
-    const open_commitments_value = parseFloat(openCommitmentsRes.rows[0].total_value).toFixed(2);
+      WHERE r.status = 'Ordered'
+        AND li.received_quantity < li.ordered_quantity
+        ${archiveCondition} 
+        ${requesterCondition}
+    `;
+    const openCommitmentsRes = await query(openCommitmentsSql, userParam);
+    const open_commitments_value = parseFloat(openCommitmentsRes.rows[0]?.total_value || '0').toFixed(2);
 
-    // 3. Overdue count
-    const overdueRes = await query(`
+    // 3. Overdue count (Submitted, Approved, or Ordered past needed_by date)
+    const overdueSql = `
       SELECT COUNT(DISTINCT r.id)
       FROM requisitions r
-      WHERE r.status = 'Ordered'
+      WHERE r.status IN ('Submitted', 'Approved', 'Ordered')
         AND r.needed_by < CURRENT_DATE
-        AND r.archived_at IS NULL
-        AND EXISTS (
-          SELECT 1 FROM line_items li 
-          WHERE li.requisition_id = r.id AND li.received_quantity < li.ordered_quantity
+        AND (
+          r.status IN ('Submitted', 'Approved') OR EXISTS (
+            SELECT 1 FROM line_items li 
+            WHERE li.requisition_id = r.id AND li.received_quantity < li.ordered_quantity
+          )
         )
-    `);
-    const overdue_count = parseInt(overdueRes.rows[0].count, 10);
+        ${archiveCondition}
+        ${requesterCondition}
+    `;
+    const overdueRes = await query(overdueSql, userParam);
+    const overdue_count = parseInt(overdueRes.rows[0]?.count || '0', 10);
 
     // 4. Received last 7 days count
     const received7DaysRes = await query(`
@@ -42,15 +69,18 @@ export const getDashboardHandler = async (
         AND new_status = 'Received'
         AND created_at >= NOW() - INTERVAL '7 days'
     `);
-    const received_last_7_days = parseInt(received7DaysRes.rows[0].count, 10);
+    const received_last_7_days = parseInt(received7DaysRes.rows[0]?.count || '0', 10);
 
     // 5. Breakdown by status
-    const statusRes = await query(`
-      SELECT status, COUNT(*) as count
-      FROM requisitions
-      WHERE archived_at IS NULL
-      GROUP BY status
-    `);
+    const statusSql = `
+      SELECT r.status, COUNT(*) as count
+      FROM requisitions r
+      WHERE 1=1
+        ${archiveCondition}
+        ${requesterCondition}
+      GROUP BY r.status
+    `;
+    const statusRes = await query(statusSql, userParam);
     const by_status: Record<string, number> = {
       Draft: 0,
       Submitted: 0,
@@ -64,13 +94,16 @@ export const getDashboardHandler = async (
     });
 
     // 6. Breakdown by department
-    const deptRes = await query(`
-      SELECT department, COUNT(*) as count
-      FROM requisitions
-      WHERE archived_at IS NULL
-      GROUP BY department
+    const deptSql = `
+      SELECT r.department, COUNT(*) as count
+      FROM requisitions r
+      WHERE 1=1
+        ${archiveCondition}
+        ${requesterCondition}
+      GROUP BY r.department
       ORDER BY count DESC
-    `);
+    `;
+    const deptRes = await query(deptSql, userParam);
     const by_department: Record<string, number> = {};
     deptRes.rows.forEach((row) => {
       by_department[row.department] = parseInt(row.count, 10);

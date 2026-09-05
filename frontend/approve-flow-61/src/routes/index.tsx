@@ -49,7 +49,22 @@ function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (me && !isApprover) navigate({ to: "/requisitions" });
+    if (me && !isApprover) {
+      navigate({
+        to: "/requisitions",
+        search: {
+          search: "",
+          status: "",
+          department: "",
+          overdue: false,
+          assigned_to_me: false,
+          sort_by: "created_at",
+          sort_dir: "desc",
+          page: 1,
+          page_size: 20,
+        },
+      });
+    }
   }, [me, isApprover, navigate]);
 
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard });

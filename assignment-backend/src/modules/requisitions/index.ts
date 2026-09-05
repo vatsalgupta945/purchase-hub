@@ -126,21 +126,31 @@ export const listRequisitionsHandler = async (
 
     if (overdueFilter) {
       whereConditions.push(`(
-        r.status = 'Ordered' AND r.needed_by < CURRENT_DATE AND EXISTS (
-          SELECT 1 FROM line_items li WHERE li.requisition_id = r.id AND li.received_quantity < li.ordered_quantity
+        r.status IN ('Submitted', 'Approved', 'Ordered') AND r.needed_by < CURRENT_DATE AND (
+          r.status IN ('Submitted', 'Approved') OR EXISTS (
+            SELECT 1 FROM line_items li WHERE li.requisition_id = r.id AND li.received_quantity < li.ordered_quantity
+          )
         )
       )`);
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    let orderByClause = 'r.needed_by ASC';
+    let orderByClause = 'r.created_at DESC';
     if (sortBy === 'total') {
       orderByClause = `total ${sortDir}`;
     } else if (sortBy === 'status') {
       orderByClause = `r.status ${sortDir}`;
     } else if (sortBy === 'needed_by') {
       orderByClause = `r.needed_by ${sortDir}`;
+    } else if (sortBy === 'created_at' || sortBy === 'created' || sortBy === 'createdAt' || sortBy === 'created_date') {
+      orderByClause = `r.created_at ${sortDir}`;
+    } else if (sortBy === 'title') {
+      orderByClause = `r.title ${sortDir}`;
+    } else if (sortBy === 'vendor_name' || sortBy === 'vendor') {
+      orderByClause = `r.vendor_name ${sortDir}`;
+    } else if (sortBy === 'department') {
+      orderByClause = `r.department ${sortDir}`;
     }
 
     const countSql = `
@@ -182,9 +192,11 @@ export const listRequisitionsHandler = async (
         ) as rejected_by_title,
         COALESCE(SUM(li.ordered_quantity * li.unit_price), 0)::NUMERIC(12,2) as total,
         (
-          r.status = 'Ordered' AND r.needed_by < CURRENT_DATE AND EXISTS (
-            SELECT 1 FROM line_items sub_li 
-            WHERE sub_li.requisition_id = r.id AND sub_li.received_quantity < sub_li.ordered_quantity
+          r.status IN ('Submitted', 'Approved', 'Ordered') AND r.needed_by < CURRENT_DATE AND (
+            r.status IN ('Submitted', 'Approved') OR EXISTS (
+              SELECT 1 FROM line_items sub_li 
+              WHERE sub_li.requisition_id = r.id AND sub_li.received_quantity < sub_li.ordered_quantity
+            )
           )
         ) as is_overdue
       FROM requisitions r
@@ -259,9 +271,11 @@ export const getRequisitionByIdHandler = async (
         ) as rejected_by_title,
         COALESCE(SUM(li.ordered_quantity * li.unit_price), 0)::NUMERIC(12,2) as total,
         (
-          r.status = 'Ordered' AND r.needed_by < CURRENT_DATE AND EXISTS (
-            SELECT 1 FROM line_items sub_li 
-            WHERE sub_li.requisition_id = r.id AND sub_li.received_quantity < sub_li.ordered_quantity
+          r.status IN ('Submitted', 'Approved', 'Ordered') AND r.needed_by < CURRENT_DATE AND (
+            r.status IN ('Submitted', 'Approved') OR EXISTS (
+              SELECT 1 FROM line_items sub_li 
+              WHERE sub_li.requisition_id = r.id AND sub_li.received_quantity < sub_li.ordered_quantity
+            )
           )
         ) as is_overdue
       FROM requisitions r

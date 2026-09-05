@@ -2,14 +2,14 @@
 
 ## Links
 
-- **GitHub repository:** https://github.com/vatsalgupta945/purchase-hub.git (or https://github.com/vatsalgupta945/test1.git)
-- **Live application (Frontend):** https://test1-nine-delta-36.vercel.app
+- **GitHub repository:** https://github.com/vatsalgupta945/test1.git
+- **Live application (Frontend):** https://test1-24zk.vercel.app/
 - **Backend API (Render):** https://test1-3-4zmi.onrender.com (Health check: https://test1-3-4zmi.onrender.com/health)
 
 ## Notes for the reviewer
+ take 45–60 seconds to wake up the service. Once awake, all requests respond instantly.
 
-> **Note on Free Tier Sleep**: The backend is hosted on Render's free tier, which automatically spins down after 15 minutes of inactivity. The very first request after an idle period may take 45–60 seconds to wake up the service. Once awake, all requests respond instantly.
-
+> **Note on Free Tier Sleep**: The backend is hosted on Render's free tier, which automatically spins down after 15 minutes of inactivity. The very first request after an idle period may
 The backend is built with Express + TypeScript + PostgreSQL. It enforces all 10 core business rules, role isolation, server-side totals, immutable timeline entries, alert dismissal snapshots, and per-item bulk approval reporting.
 
 ## Demo credentials

@@ -61,7 +61,7 @@ const SORTS = [
 
 function RequisitionsList() {
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/requisitions" });
+  const navigate = useNavigate({ from: "/requisitions/" });
   const { isApprover } = useAuth();
   const [searchInput, setSearchInput] = useState(search.search);
   const [deptInput, setDeptInput] = useState(search.department);
@@ -72,7 +72,7 @@ function RequisitionsList() {
 
   const setSearch = (patch: Partial<Search>) =>
     navigate({
-      search: (prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }),
+      search: (prev: Search) => ({ ...prev, ...patch, page: patch.page ?? 1 }),
     });
 
   // Automatic live search with debounce
@@ -361,7 +361,7 @@ function RequisitionsList() {
             size="sm"
             variant="outline"
             disabled={search.page <= 1}
-            onClick={() => navigate({ search: (p) => ({ ...p, page: p.page - 1 }) })}
+            onClick={() => setSearch({ page: search.page - 1 })}
           >
             Previous
           </Button>
@@ -369,7 +369,7 @@ function RequisitionsList() {
             size="sm"
             variant="outline"
             disabled={search.page >= pages}
-            onClick={() => navigate({ search: (p) => ({ ...p, page: p.page + 1 }) })}
+            onClick={() => setSearch({ page: search.page + 1 })}
           >
             Next
           </Button>

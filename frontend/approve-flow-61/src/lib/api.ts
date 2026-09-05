@@ -54,14 +54,18 @@ export async function rawFetch(
   }
   const url = `${BASE}${path}${qs.toString() ? `?${qs.toString()}` : ""}`;
 
-  const res = await fetch(url, {
+  const fetchInit: RequestInit = {
     method: options.method ?? "GET",
     headers: {
       ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...(await authHeader()),
     },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  };
+  if (options.body !== undefined) {
+    fetchInit.body = JSON.stringify(options.body);
+  }
+
+  const res = await fetch(url, fetchInit);
 
   if (!res.ok) {
     let code = `HTTP_${res.status}`;
@@ -160,11 +164,33 @@ export type TimelineEntry = {
   requisition_id: string;
   event_type?: string;
   action?: string;
+  old_status?: string | null;
+  new_status?: string | null;
+  reason?: string | null;
+  details?: Record<string, unknown> | null;
   body?: string;
   actor_email?: string;
+  actor_title?: string;
+  actor_role?: string;
   actor_id?: string;
   created_at: string;
   [k: string]: unknown;
+};
+
+export type AlertItem = {
+  id: string;
+  title: string;
+  vendor_name: string;
+  department: string;
+  needed_by: string;
+  status: string;
+  owner_id: string;
+  owner_email?: string;
+  owner_title?: string;
+  owner_department?: string;
+  total: string | number;
+  is_overdue: boolean;
+  is_dismissed?: boolean;
 };
 
 export type Approver = { approver_id: string; email: string; assigned_at: string };
@@ -186,7 +212,7 @@ export const api = {
   hierarchy: () => apiFetch<{ data: HierarchyUser[] }>("/approvers/hierarchy"),
   createProfile: () => apiFetch<unknown>("/profiles", { method: "POST", body: {} }),
   dashboard: () => apiFetch<DashboardData>("/dashboard"),
-  alerts: () => apiFetch<{ data: unknown[]; count: number }>("/alerts"),
+  alerts: () => apiFetch<{ data: AlertItem[]; count: number }>("/alerts"),
   dismissAlert: (id: string) => apiFetch(`/alerts/${id}/dismiss`, { method: "POST" }),
 
   listRequisitions: (query: Record<string, unknown>) =>
