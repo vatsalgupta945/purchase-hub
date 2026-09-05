@@ -403,3 +403,85 @@ This document records the exact prompts and workflow instructions used across al
 
 ---
 
+## Prompt Group 20: Comprehensive Architecture, Implementation & Prompt Documentation
+**Goal**: Document the complete system architecture, technical choices, challenge resolutions, and full prompt history in the project documentation.
+
+**Prompt**:
+> okay the project is running give me the implementation plan of how this project got implemented ,various challenges you and i faced ,and architecture ,tech stack that was used ,and why
+> OKAY and also document whatever prompts i have used with you in ai prompts ,till deployement process and live site ,include all prompts even of previous sessions
+
+**Output Evaluation**:
+- **Implementation**:
+  1. Compiled exhaustive architecture and implementation summary covering decoupled frontend/backend design, PostgreSQL transactional guarantees, and tech stack rationale.
+  2. Updated `docs/ai-prompts.md` with complete chronological records of all 20 prompt groups across planning, business logic, hierarchical approvals, user-scoped archiving, live cloud deployment, and compiler debugging.
+
+---
+
+## Prompt Group 21: Business Rule Fixes (Dashboard Approvals, Timeline Status Changes, Multi-Status Overdue Alerts & Created-by Sorting)
+**Goal**: Address 4 specific business logic and UI requirements:
+1. Align the Dashboard "Awaiting Approval" counter with the Approver Queue by properly accounting for per-user archiving.
+2. In the requisition detail History Timeline, display explicit status transitions (e.g. "Status changed to REJECTED", "Status changed to APPROVED") with badges and rejection reasons instead of generic "Status changed" text.
+3. Activate overdue alerts across `Submitted`, `Approved`, and `Ordered` statuses when the requisition's `needed_by` date has passed today, keeping overdue records accessible in the alert icon and re-triggering if the extended date passes again.
+4. Fix and enable sorting order for "Created-by / Creation Date" in requisition table views.
+
+**Prompt (Audio)**:
+> Hello, okay so now you have to do some changes in the file. For example, first thing in the dashboard it is, make it sure for every approver it shows the correct awaiting requests, awaiting approvals. For example even if there are 3 awaiting approvals, sometimes it's showing 2 awaiting approvals. So make sure the total number of awaiting approval per approver is same as the awaiting approval shown in the dashboard. Second is the status change problem in the history timeline. In the history timeline, you are writing it as 'Status Changed' when any status of the requisition is getting changed. For example if a requisition status is getting changed to 'APPROVED', it is saying that status changed. And for example if a status is getting rejected, it's saying status change. Make sure you put the correct status there. For example if the status is changed to REJECTED, it should show at that particular time the status has been changed to REJECTED, not just status changed. Third is the overdue alert is not working. The overdue alert should be start working in the alert bar for all the requisitions for all the approvers that are overdue. And the overdue should start at SUBMITTED. It should be start at SUBMITTED, APPROVED, and ORDERED. For all three it should show the alert for requisitions that are overdue. The requisitions that have been overdue should be shown in the alert icon. And if the requisition is again overdue even after extending the date, then also it show overdue for SUBMITTED, APPROVED, and ORDERED. And the next thing is that the sorting order is wrong for created by date. Check the sorting order, it is not sorting properly for the created by date. So make these changes in the file, and don't push them on GitHub. First do local run, then change on GitHub if it's working properly.
+
+**Output Evaluation**:
+- **Implementation**:
+  1. **Dashboard Awaiting Approval Count**: Updated `getDashboardHandler` (`assignment-backend/src/modules/dashboard/index.ts`) to join `user_archived_requisitions` specifically for the current approver, ensuring the awaiting approval count precisely matches the approver's active queue.
+  2. **Explicit Timeline Status Messages**: Updated `TimelineItem` in `frontend/approve-flow-61/src/routes/requisitions.$id.tsx` to inspect `meta.old_status` and `meta.new_status` (and parse status transitions from action descriptions), displaying explicit labels such as *"Status changed to REJECTED"* or *"Status changed to APPROVED"* with color-coded status badges and approver rejection reasons.
+  3. **Multi-Status Overdue Alerts**: Updated SQL queries in `assignment-backend/src/modules/alerts/index.ts`, `requisitions/index.ts`, and `dashboard/index.ts` so requisitions in `Submitted`, `Approved`, or `Ordered` status with `needed_by < CURRENT_DATE` are flagged as overdue. Overdue dismissals snapshot `needed_by` so extended dates that lapse again automatically re-trigger the alert.
+  4. **Created-by Sorting**: Added `created_at` / `created_by` column mapping to `sort_by` in `assignment-backend/src/modules/requisitions/index.ts` and wired sort controls into the frontend requisitions table.
+
+---
+
+## Prompt Group 22: Local Dual-Server Environment Execution
+**Goal**: Launch local development servers for both Express backend and Vite frontend to test and verify recent business rule changes.
+
+**Prompt**:
+> run the app locally local host
+
+**Output Evaluation**:
+- **Implementation**:
+  1. Started backend Express development server on `http://localhost:5000` (`npm run dev`).
+  2. Started frontend Vite development server on `http://localhost:8080` (`npm run dev`).
+  3. Verified health check endpoints and real-time database querying against Supabase PostgreSQL.
+
+---
+
+## Prompt Group 23: Overdue Alert Icon Record Retention & Open Commitments Calculation Fix
+**Goal**: Refine overdue alert dismissal UX and correct the Open Commitments metric:
+1. When dismissing an overdue alert from the top pop-up banner, only remove the banner pop-up for the session, while keeping the full record of all overdue requisitions visible in the Alert Bell icon dropdown. Ensure that if `needed_by` is extended and lapses again without receiving, the overdue pop-up re-triggers.
+2. In the Dashboard, verify and correct the Open Commitments calculation to accurately reflect outstanding unfulfilled financial commitments.
+
+**Prompt**:
+> 1.for overdue alert icon you are removing the overdue requestion in alert icon  when i am pressing dismiss ,then the alert should go for that session ,but the overdue requistions should appear if i press alert icon ,they shouldnt vanish from overdue alert icon they should still be there just the pop up from my screen should stop showing when i press dismiss for a particular requisition,but record of overdue requests should be present in overdue alert icon,and also make sure that if i extend the needed by date for a overdue reqution ,if it hasnt still been received after new extended date then it should show overdue again
+> 
+> 2.in the dashboard ,check functionality of open commitments and correct it
+
+**Output Evaluation**:
+- **Implementation**:
+  1. **Alert Icon Record Retention & Pop-up Dismissal**:
+     - Updated `listAlertsHandler` (`assignment-backend/src/modules/alerts/index.ts`) to return all overdue requisitions with an `is_dismissed: boolean` flag indicating whether the approver dismissed the on-screen banner for that `needed_by` snapshot.
+     - Updated `AppShell.tsx`: The top `OverdueAlertBar` only displays un-dismissed items (`is_dismissed === false`), while the Bell icon `AlertsPopover` displays the complete persistent list of all overdue items with direct links to the requisition detail page.
+  2. **Dashboard Open Commitments Calculation**:
+     - Corrected `openCommitmentsSql` in `assignment-backend/src/modules/dashboard/index.ts` to compute the exact outstanding unreceived dollar amount: $\sum (\text{ordered\_quantity} - \text{received\_quantity}) \times \text{unit\_price}$ for unfulfilled line items across active `Approved` and `Ordered` requisitions (excluding Drafts, Submitted, Rejected, fully Received, and user-archived requests).
+
+---
+
+## Prompt Group 24: Git Synchronization & Push to Remote GitHub Repository
+**Goal**: Commit all verified frontend and backend changes to version control and synchronize with the remote GitHub repository.
+
+**Prompt**:
+> commit all changes to github
+
+**Output Evaluation**:
+- **Implementation**:
+  1. Staged all updated files across backend modules (`alerts`, `dashboard`, `requisitions`), frontend routes and components (`AppShell.tsx`, `requisitions.$id.tsx`, `api.ts`), test suites, and project documentation.
+  2. Created Git commit `b74844e` (*"Fix business rules: overdue alert retention, dashboard open commitments, timeline status display, and approver counts"*).
+  3. Pulled and rebased remote changes from `origin/main` and pushed the unified commit history cleanly to `https://github.com/vatsalgupta945/purchase-hub.git`.
+
+
+---
+
